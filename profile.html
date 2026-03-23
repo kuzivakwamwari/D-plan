@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0e0e0e">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  <link rel="stylesheet" href="./style.css">
+  <title>Users — PWA App</title>
+  <style>
+    .avatar {
+      width: 40px; height: 40px;
+      border-radius: 50%;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 700;
+      font-size: .9rem;
+      flex-shrink: 0;
+    }
+    .user-row-info { display: flex; align-items: center; gap: 12px; }
+    .color-picker-row {
+      display: flex; gap: 8px; flex-wrap: wrap; margin-top: 6px;
+    }
+    .color-swatch {
+      width: 28px; height: 28px;
+      border-radius: 50%;
+      cursor: pointer;
+      border: 2px solid transparent;
+      transition: border-color .15s, transform .15s;
+    }
+    .color-swatch.selected { border-color: #fff; transform: scale(1.2); }
+  </style>
+</head>
+<body>
+
+<button class="nav-toggle" id="navToggle">☰</button>
+
+<div class="layout">
+
+  <!-- Sidebar -->
+  <aside class="sidebar" id="sidebar">
+    <div class="sidebar-logo">
+      <span>// pwa app</span>
+      <h2>DataStore</h2>
+    </div>
+    <nav class="sidebar-nav">
+      <div class="nav-label">Main</div>
+      <a href="./index.html"    class="nav-item"><span class="icon">⊞</span> Dashboard</a>
+      <a href="./contacts.html" class="nav-item"><span class="icon">◈</span> Contacts</a>
+      <a href="./profile.html"  class="nav-item active"><span class="icon">◉</span> Users</a>
+    </nav>
+    <div class="sidebar-footer">
+      <span class="online-dot"></span>
+      <span id="sw-status">SW loading...</span>
+    </div>
+  </aside>
+
+  <!-- Main -->
+  <main class="main">
+
+    <div class="page-header fade-in">
+      <p class="page-tag">// user details</p>
+      <h1>Users</h1>
+      <p>User profiles stored in IndexedDB. All data lives on your device.</p>
+    </div>
+
+    <!-- Add / Edit Form -->
+    <div class="card fade-in d1">
+      <div class="card-title" id="form-title">// add new user</div>
+      <input type="hidden" id="edit-id">
+
+      <div class="form-row">
+        <div class="form-group">
+          <label for="u-username">Username *</label>
+          <input type="text" id="u-username" placeholder="e.g. jdoe">
+        </div>
+        <div class="form-group">
+          <label for="u-email">Email *</label>
+          <input type="email" id="u-email" placeholder="jane@example.com">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="u-fullname">Full Name</label>
+          <input type="text" id="u-fullname" placeholder="Jane Doe">
+        </div>
+        <div class="form-group">
+          <label for="u-role">Role</label>
+          <select id="u-role">
+            <option value="user">User</option>
+            <option value="admin">Admin</option>
+            <option value="editor">Editor</option>
+            <option value="viewer">Viewer</option>
+            <option value="moderator">Moderator</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label for="u-phone">Phone</label>
+          <input type="tel" id="u-phone" placeholder="+263 77 123 4567">
+        </div>
+        <div class="form-group">
+          <label for="u-location">Location</label>
+          <input type="text" id="u-location" placeholder="e.g. Harare, Zimbabwe">
+        </div>
+      </div>
+      <div class="form-group">
+        <label for="u-bio">Bio</label>
+        <textarea id="u-bio" placeholder="Short bio or description..."></textarea>
+      </div>
+      <div class="form-group">
+        <label>Avatar Colour</label>
+        <div class="color-picker-row" id="color-picker">
+          <!-- Swatches injected by JS -->
+        </div>
+        <input type="hidden" id="u-color" value="#f5a623">
+      </div>
+
+      <div style="display:flex; gap:10px; flex-wrap:wrap;">
+        <button class="btn btn-primary" onclick="saveUser()">
+          <span id="save-label">+ Save User</span>
+        </button>
+        <button class="btn btn-ghost" onclick="clearForm()" id="cancel-btn" style="display:none">✕ Cancel</button>
+      </div>
+    </div>
+
+    <!-- Search + count -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:10px;" class="fade-in d2">
+      <div class="form-group" style="margin:0;flex:1;min-width:200px;">
+        <input type="text" id="search-input" placeholder="Search users..." oninput="filterUsers()">
+      </div>
+      <span style="font-family:var(--mono);font-size:.72rem;color:var(--muted);white-space:nowrap;" id="count-label"></span>
+    </div>
+
+    <!-- Users grid -->
+    <div id="users-grid" class="fade-in d2"></div>
+
+  </main>
+</div>
+
+<!-- Delete modal -->
+<div class="modal-overlay" id="delete-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Delete User</h3>
+      <button class="modal-close" onclick="closeDeleteModal()">✕</button>
+    </div>
+    <p style="color:var(--muted);font-size:.9rem;margin-bottom:20px;">
+      Delete user <strong id="delete-name"></strong>? This cannot be undone.
+    </p>
+    <div style="display:flex;gap:10px;">
+      <button class="btn btn-danger" onclick="confirmDelete()">Delete</button>
+      <button class="btn btn-ghost"  onclick="closeDeleteModal()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="./db.js"></script>
+<script>
+  // ── Nav toggle ────────────────────────────────────────────────
+  const sidebar   = document.getElementById('sidebar');
+  const navToggle = document.getElementById('navToggle');
+  navToggle.addEventListener('click', () => sidebar.classList.toggle('open'));
+  document.addEventListener('click', e => {
+    if (!sidebar.contains(e.target) && !navToggle.contains(e.target))
+      sidebar.classList.remove('open');
+  });
+
+  // ── Toast ─────────────────────────────────────────────────────
+  function showToast(msg, isError = false) {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = isError ? 'error' : '';
+    t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // ── Avatar colours ────────────────────────────────────────────
+  const COLORS = [
+    '#f5a623','#ff5c5c','#4ade80','#60a5fa',
+    '#f472b6','#a78bfa','#34d399','#fb923c',
+    '#e879f9','#38bdf8'
+  ];
+
+  function buildColorPicker(selected = '#f5a623') {
+    const row = document.getElementById('color-picker');
+    row.innerHTML = COLORS.map(c => `
+      <div class="color-swatch ${c === selected ? 'selected' : ''}"
+           style="background:${c}"
+           onclick="selectColor('${c}')"
+           title="${c}">
+      </div>`).join('');
+    document.getElementById('u-color').value = selected;
+  }
+
+  function selectColor(color) {
+    document.getElementById('u-color').value = color;
+    buildColorPicker(color);
+  }
+
+  // ── State ─────────────────────────────────────────────────────
+  let allUsers     = [];
+  let deleteTarget = null;
+
+  // ── Load & render ─────────────────────────────────────────────
+  async function loadUsers() {
+    allUsers = await db.users.getAll();
+    renderUsers(allUsers);
+  }
+
+  function renderUsers(list) {
+    const grid = document.getElementById('users-grid');
+    document.getElementById('count-label').textContent =
+      `${list.length} user${list.length !== 1 ? 's' : ''}`;
+
+    if (!list.length) {
+      grid.innerHTML = `
+        <div class="card">
+          <div class="empty-state">
+            <div class="empty-icon">◉</div>
+            <p>No users yet. Add one above!</p>
+          </div>
+        </div>`;
+      return;
+    }
+
+    // Render as cards grid
+    grid.innerHTML = `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px;">
+        ${list.map(u => userCard(u)).join('')}
+      </div>`;
+  }
+
+  function userCard(u) {
+    const initials = (u.fullname || u.username || '?')
+      .split(' ').map(w => w[0]).join('').toUpperCase().slice(0,2);
+    const color  = u.color || '#f5a623';
+    const roleClass = u.role === 'admin' ? 'badge-red'
+                    : u.role === 'editor' ? 'badge-amber' : 'badge-green';
+    const date = u.createdAt
+      ? new Date(u.createdAt).toLocaleDateString('en-GB', {day:'2-digit',month:'short',year:'numeric'})
+      : '—';
+
+    return `
+      <div class="card" style="margin:0;padding:20px;">
+        <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:14px;">
+          <div class="user-row-info">
+            <div class="avatar" style="background:${color};color:#000">${initials}</div>
+            <div>
+              <div style="font-weight:700;font-size:.95rem">${escHtml(u.username)}</div>
+              <div style="font-size:.78rem;color:var(--muted)">${escHtml(u.fullname || '')}</div>
+            </div>
+          </div>
+          <span class="badge ${roleClass}">${escHtml(u.role || 'user')}</span>
+        </div>
+
+        <div style="font-size:.82rem;color:var(--muted);margin-bottom:6px;">
+          ${u.email ? `<div>✉ ${escHtml(u.email)}</div>` : ''}
+          ${u.phone ? `<div>☎ ${escHtml(u.phone)}</div>` : ''}
+          ${u.location ? `<div>⌖ ${escHtml(u.location)}</div>` : ''}
+        </div>
+
+        ${u.bio ? `<p style="font-size:.82rem;color:var(--muted);border-top:1px solid var(--border);padding-top:10px;margin-top:10px;line-height:1.5">${escHtml(u.bio)}</p>` : ''}
+
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px;border-top:1px solid var(--border);padding-top:12px;">
+          <span style="font-family:var(--mono);font-size:.62rem;color:var(--muted)">Added ${date}</span>
+          <div style="display:flex;gap:6px;">
+            <button class="btn btn-ghost btn-sm" onclick="editUser(${u.id})">Edit</button>
+            <button class="btn btn-danger btn-sm" onclick="openDeleteModal(${u.id}, '${escHtml(u.username)}')">Del</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  // ── Search ────────────────────────────────────────────────────
+  function filterUsers() {
+    const q = document.getElementById('search-input').value.toLowerCase();
+    const filtered = allUsers.filter(u =>
+      u.username?.toLowerCase().includes(q)  ||
+      u.email?.toLowerCase().includes(q)     ||
+      u.fullname?.toLowerCase().includes(q)  ||
+      u.role?.toLowerCase().includes(q)      ||
+      u.location?.toLowerCase().includes(q)
+    );
+    renderUsers(filtered);
+  }
+
+  // ── Save ──────────────────────────────────────────────────────
+  async function saveUser() {
+    const username = document.getElementById('u-username').value.trim();
+    const email    = document.getElementById('u-email').value.trim();
+    if (!username) { showToast('Username is required', true); return; }
+    if (!email)    { showToast('Email is required', true); return; }
+
+    const data = {
+      username,
+      email,
+      fullname: document.getElementById('u-fullname').value.trim(),
+      role:     document.getElementById('u-role').value,
+      phone:    document.getElementById('u-phone').value.trim(),
+      location: document.getElementById('u-location').value.trim(),
+      bio:      document.getElementById('u-bio').value.trim(),
+      color:    document.getElementById('u-color').value,
+    };
+
+    const editId = document.getElementById('edit-id').value;
+
+    try {
+      if (editId) {
+        await db.users.update({ ...data, id: Number(editId) });
+        showToast('✓ User updated');
+      } else {
+        await db.users.add(data);
+        showToast('✓ User saved');
+      }
+      clearForm();
+      loadUsers();
+    } catch (e) {
+      showToast('Error — username or email may already exist', true);
+      console.error(e);
+    }
+  }
+
+  // ── Edit ──────────────────────────────────────────────────────
+  async function editUser(id) {
+    const u = await db.users.getById(id);
+    if (!u) return;
+
+    document.getElementById('edit-id').value    = u.id;
+    document.getElementById('u-username').value = u.username;
+    document.getElementById('u-email').value    = u.email;
+    document.getElementById('u-fullname').value = u.fullname || '';
+    document.getElementById('u-role').value     = u.role || 'user';
+    document.getElementById('u-phone').value    = u.phone || '';
+    document.getElementById('u-location').value = u.location || '';
+    document.getElementById('u-bio').value      = u.bio || '';
+    buildColorPicker(u.color || '#f5a623');
+
+    document.getElementById('form-title').textContent  = '// edit user';
+    document.getElementById('save-label').textContent  = '✓ Update User';
+    document.getElementById('cancel-btn').style.display = '';
+
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  }
+
+  // ── Clear form ────────────────────────────────────────────────
+  function clearForm() {
+    ['u-username','u-email','u-fullname','u-phone','u-location','u-bio']
+      .forEach(id => document.getElementById(id).value = '');
+    document.getElementById('u-role').value     = 'user';
+    document.getElementById('edit-id').value    = '';
+    buildColorPicker('#f5a623');
+    document.getElementById('form-title').textContent  = '// add new user';
+    document.getElementById('save-label').textContent  = '+ Save User';
+    document.getElementById('cancel-btn').style.display = 'none';
+  }
+
+  // ── Delete modal ──────────────────────────────────────────────
+  function openDeleteModal(id, name) {
+    deleteTarget = id;
+    document.getElementById('delete-name').textContent = name;
+    document.getElementById('delete-modal').classList.add('open');
+  }
+  function closeDeleteModal() {
+    deleteTarget = null;
+    document.getElementById('delete-modal').classList.remove('open');
+  }
+  async function confirmDelete() {
+    if (!deleteTarget) return;
+    await db.users.remove(deleteTarget);
+    closeDeleteModal();
+    showToast('✓ User deleted');
+    loadUsers();
+  }
+
+  // ── Escape HTML ───────────────────────────────────────────────
+  function escHtml(str) {
+    return String(str)
+      .replace(/&/g,'&amp;')
+      .replace(/</g,'&lt;')
+      .replace(/>/g,'&gt;')
+      .replace(/"/g,'&quot;');
+  }
+
+  // ── SW ────────────────────────────────────────────────────────
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('./sw.js').then(reg => {
+      document.getElementById('sw-status').textContent =
+        reg.active ? 'SW active' : 'SW installing';
+    });
+  }
+
+  // ── Init ──────────────────────────────────────────────────────
+  buildColorPicker();
+  loadUsers();
+</script>
+</body>
+</html>
